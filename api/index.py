@@ -145,7 +145,7 @@ def publicar_en_facebook(titulo, cuerpo_ia, imagen_url, hashtags=""):
         }
     
     try:
-        r = requests.post(url, data=payload)
+        r = requests.post(url, data=payload, timeout=5)
         resultado = r.json()
         if r.status_code == 200:
             print("✅ ¡Publicado en Facebook con éxito!")
@@ -185,7 +185,7 @@ def publicar_clima():
     try:
         # API Open-Meteo (Gratis) - Coordenadas de Comodoro Rivadavia
         url = "https://api.open-meteo.com/v1/forecast?latitude=-45.8641&longitude=-67.4966&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=1"
-        r = requests.get(url)
+        r = requests.get(url, timeout=3)
         data = r.json()
         
         daily = data.get('daily', {})
@@ -209,13 +209,15 @@ def publicar_clima():
 def ejecutar_bot(url_rss):
     print(f"Analizando fuente: {url_rss}")
     try:
-        feed = feedparser.parse(url_rss)
+        # Usamos requests con timeout para evitar que se cuelgue si la web es lenta
+        resp = requests.get(url_rss, timeout=4)
+        feed = feedparser.parse(resp.content)
     except Exception as e:
         print(f"Error leyendo RSS: {e}")
-        return
+        return False
 
-    # Procesamos las 2 primeras noticias para probar
-    for entry in feed.entries[:2]:
+    # Revisamos hasta 3 entradas, pero cortamos apenas publicamos una
+    for entry in feed.entries[:3]:
         guid = entry.link
         
         # Verificar si ya existe en la base de datos
@@ -242,7 +244,9 @@ def ejecutar_bot(url_rss):
                 print("✅ Publicado en Blogger")
                 publicar_en_facebook(nuevo_titulo, cuerpo, imagen, tags)
                 registrar_noticia(guid)
-                # time.sleep(5) # Pausa eliminada para evitar timeout en Vercel
+                return True # ÉXITO: Retornamos True para detener el ciclo principal
+    
+    return False
 
 # --- 6. EJECUCIÓN MULTI-FUENTE ---
 def main_process():
@@ -284,15 +288,17 @@ def main_process():
     # Publicar clima (se ejecuta una vez al día)
     publicar_clima()
     
-    # IMPORTANTE: Vercel Free tiene límite de 10 seg. Elegimos 2 fuentes al azar por ejecución.
+    # ESTRATEGIA VERCEL: Publicar SOLO 1 noticia por ejecución para no exceder los 10 segundos.
     random.shuffle(lista_fuentes)
-    fuentes_seleccionadas = lista_fuentes[:2]
     
-    for url in fuentes_seleccionadas:
-        ejecutar_bot(url)
+    # Probamos fuentes hasta que logremos publicar algo o revisemos 3
+    for url in lista_fuentes[:3]:
+        if ejecutar_bot(url):
+            print(f"✅ Noticia publicada de {url}. Terminando ejecución para evitar Timeout.")
+            break
         total_revisadas += 1
     
-    print(f"\n✅ Ciclo completado. Se revisaron {total_revisadas} fuentes al azar.")
+    print(f"\n✅ Ciclo completado.")
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
