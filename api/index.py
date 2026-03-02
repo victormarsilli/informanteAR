@@ -10,6 +10,7 @@ import datetime
 from supabase import create_client
 from http.server import BaseHTTPRequestHandler
 import os
+import traceback
 
 # Configuración de Informante AR
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -149,7 +150,8 @@ def publicar_en_facebook(titulo, cuerpo_ia, imagen_url, hashtags=""):
             print("✅ ¡Publicado en Facebook con éxito!")
         else:
             # Si vuelve a fallar, el error nos dirá exactamente qué permiso falta
-            print(f"⚠️ Detalle del error: {resultado.get('error').get('message')}")
+            error_info = resultado.get('error', {})
+            print(f"⚠️ Detalle del error: {error_info.get('message', resultado) if isinstance(error_info, dict) else error_info}")
     except Exception as e:
         print(f"❌ Error conexión FB: {e}")
 
@@ -290,8 +292,21 @@ def main_process():
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        main_process()
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.end_headers()
-        self.wfile.write("Ejecucion completada".encode('utf-8'))
+        # Evitar ejecución doble por favicon del navegador
+        if self.path == '/favicon.ico':
+            self.send_response(200)
+            self.end_headers()
+            return
+
+        try:
+            main_process()
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain; charset=utf-8')
+            self.end_headers()
+            self.wfile.write("Ejecucion completada con éxito".encode('utf-8'))
+        except Exception as e:
+            self.send_response(500)
+            self.send_header('Content-type', 'text/plain; charset=utf-8')
+            self.end_headers()
+            error_msg = f"Error en la ejecución:\n{str(e)}\n\n{traceback.format_exc()}"
+            self.wfile.write(error_msg.encode('utf-8'))
