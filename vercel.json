@@ -1,14 +1,21 @@
 {
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/index",
+      "dest": "api/index.py"
+    }
+  ],
   "crons": [
     {
       "path": "/api/index",
       "schedule": "0 * * * *"
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/index",
-      "destination": "index.py"
     }
   ]
 }

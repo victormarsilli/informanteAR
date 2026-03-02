@@ -11,6 +11,7 @@ from supabase import create_client
 from http.server import BaseHTTPRequestHandler
 import os
 import traceback
+import random
 
 # Configuración de Informante AR
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -283,12 +284,15 @@ def main_process():
     # Publicar clima (se ejecuta una vez al día)
     publicar_clima()
     
-    for url in lista_fuentes:
+    # IMPORTANTE: Vercel Free tiene límite de 10 seg. Elegimos 2 fuentes al azar por ejecución.
+    random.shuffle(lista_fuentes)
+    fuentes_seleccionadas = lista_fuentes[:2]
+    
+    for url in fuentes_seleccionadas:
         ejecutar_bot(url)
         total_revisadas += 1
     
-    print(f"\n✅ Ciclo completado. Se revisaron {total_revisadas} fuentes de noticias.")
-    print(f"Hora de finalización: {time.ctime()}")
+    print(f"\n✅ Ciclo completado. Se revisaron {total_revisadas} fuentes al azar.")
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
